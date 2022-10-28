@@ -1,3 +1,5 @@
 # Downloading the data
-Here is where I would put instructions on where to download the data...
-IF I HAD ANY
+
+1. Go to this website https://x-lance.github.io/WebSRC/
+2. Press the big DOWNLOAD button
+3. Further instructions to come
