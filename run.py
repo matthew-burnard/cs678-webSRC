@@ -28,7 +28,7 @@ def main():
 	elif args.model_type.lower() == "electra": # electra
 		config = ElectraConfig.from_pretrained("google/electra-large-discriminator")
 		tokenizer = ElectraTokenizer.from_pretrained("google/electra-large-discriminator")
-		model = BertForQuestionAnswering.from_pretrained("google/electra-large-discriminator")
+		model = ElectraForQuestionAnswering.from_pretrained("google/electra-large-discriminator")
 	else:
 		print("Please enter either bert or electra for model type")
 		exit()
