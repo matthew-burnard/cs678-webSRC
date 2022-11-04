@@ -1,5 +1,5 @@
 import argparse
-import transformers
+from transformers import BertConfig, BertTokenizer, BertForQuestionAnswering, ElectraConfig, ElectraTokenizer, ElectraForQuestionAnswering
 
 def my_parse_args():
 
