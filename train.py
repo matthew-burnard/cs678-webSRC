@@ -73,7 +73,6 @@ if __name__ == "__main__":
     tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
     model = AutoModelForQuestionAnswering.from_pretrained("bert-base-uncased")
 
-    os.chdir('/content/drive/MyDrive/WebSRC-Baseline/src')
     features = torch.load('../data/cached/cached_train_bert-base-uncased_384_HTML')
 
     # Build the dataset from the features

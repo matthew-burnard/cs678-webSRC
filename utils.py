@@ -1,123 +1,74 @@
-import pandas as pd
-import re
-import json
+from __future__ import absolute_import, division, print_function
 
-import os
+import json
+import logging
+import math
+import collections
+from io import open
+from os import path as osp
 
 from tqdm import tqdm
+import bs4
+from bs4 import BeautifulSoup as bs
+from transformers.tokenization_bert import BasicTokenizer, whitespace_tokenize
 
-data_filepath="./data/"
+# NOTE: Taken directly from author code so we can use preprocessed data.
+class InputFeatures(object):
+  r"""
+  The Container for the Features of Input Doc Spans.
+  Arguments:
+      unique_id (int): the unique id of the input doc span.
+      example_index (int): the index of the corresponding SRC Example of the input doc span.
+      page_id (str): the id of the corresponding web page of the question.
+      doc_span_index (int): the index of the doc span among all the doc spans which corresponding to the same SRC
+                            Example.
+      tokens (list[str]): the sub-tokens of the input sequence, including cls token, sep tokens, and the sub-tokens
+                          of the question and HTML file.
+      token_to_orig_map (dict[int, int]): the mapping from the HTML file's sub-tokens in the sequence tokens (tokens)
+                                          to the origin tokens (all_tokens in the corresponding SRC Example).
+      token_is_max_context (dict[int, bool]): whether the current doc span contains the max pre- and post-context for
+                                              each HTML file's sub-tokens.
+      input_ids (list[int]): the ids of the sub-tokens in the input sequence (tokens).
+      input_mask (list[int]): use 0/1 to distinguish the input sequence from paddings.
+      segment_ids (list[int]): use 0/1 to distinguish the question and the HTML files.
+      paragraph_len (int): the length of the HTML file's sub-tokens.
+      start_position (int): the position where the answer starts in the input sequence (0 if the answer is not fully
+                            in the input sequence).
+      end_position (int): the position where the answer ends in the input sequence; NOTE that the answer tokens
+                          include the token at end_position (0 if the answer is not fully in the input sequence).
+      token_to_tag_index (list[int]): the mapping from sub-tokens of the input sequence to the id of the deepest tag
+                                      it belongs to.
+      is_impossible (bool): whether the answer is fully in the doc span.
+  """
 
-def get_html_from_file(filepath):
-  with open(filepath, 'r') as file:
-    output = []
-    for line in file.readlines():
-      #print(line + "\n")
-      line = re.sub('[^0-9a-zA-Z<>\' /\"]+', '', line)
-      token = []
-      in_tag=False
-      ignoring_chars=False
-      # lets scan through the html line by line
-      # the idea here is we want to
-      for char in line:
-        if in_tag: 
-          if ignoring_chars:
-            if char=='>':
-              in_tag=False
-              ignoring_chars=False
-              token.append(char)
-              output.append("".join(token))
-              token=[]
-            else:
-              continue
-          else:
-            if char==' ':
-              ignoring_chars=True
-            elif char=='>':
-              in_tag=False
-              token.append(char)
-              output.append("".join(token))
-              token=[]
-            else:
-              token.append(char)
-        else:
-          if char=='<':
-            token.append(char)
-            in_tag=True
-          elif token=='/':
-            continue #skipping these outside of tags
-          elif char==' ':
-            if token != []:
-              output.append("".join(token))
-              token=[]
-            else:
-              continue
-          else:
-            token.append(char)
-  #return output
-  return " ".join(output)
-
-def test_get_html_from_file():
-  filepath = "./data/auto/01/processed_data/0100001.html"
-  print(get_html_from_file(filepath))
-
-#test_get_html_from_file()
-
-#print(train_json['data'][0]['websites'][0]['qas'][0]['answers'])
-
-def build_dataframe(filepath, verbose=True):
-  json_obj = json.load(open(train_filepath))
-  cols = ['text', 'question', 'answer']
-  rows = []
-  total = 0
-  for domain in json_obj['data']:
-    for website in domain['websites']:
-      total += len(website['qas'])
-  
-  if verbose:
-    print(f"Building dataframe from {filepath}")
-    pbar=tqdm(total=total)
-  for domain in json_obj['data']:
-    domain_name=domain['domain']
-    # Get the list of answers paired with question ids
-    qa_frame=[]
-    for (root,dirs,files) in os.walk(data_filepath+domain_name):
-      for dir in dirs:
-        csv_filepath=root+"/"+dir+"/dataset.csv"
-        qa_frame.append(pd.read_csv(csv_filepath))
-      break
-    qa_frame=pd.concat(qa_frame)
-    for website in domain['websites']:
-      page_id=website['page_id']
-      page_filepath = data_filepath+domain_name+"/" + page_id[:2] + "/processed_data/" + page_id + ".html"
-      text=get_html_from_file(page_filepath)
-      for qa in website['qas']:
-        id=qa['id']
-        answer=qa_frame.loc[qa_frame['id']==qa['id']]['answer'].values[0]
-        question = qa['question']
-        rows.append([text,question,answer])
-        if verbose:
-          pbar.update(1)
-    if verbose:
-      pbar.close()
-    dataframe=pd.DataFrame(data=rows,columns=cols)
-    return dataframe
-
-def save_dataframe(dataframe, filepath):
-  dataframe.to_csv(filepath)
-
-def load_dataframe(filepath):
-  return pd.read_csv(filepath)
-
-if __name__=="__main__":
-  train_filepath = "./data/websrc1.0_train_.json"
-  dev_filepath = "./data/websrc1.0_dev_.json"
-  test_filepath = "./data/websrc1.0_test_.json"
-  
-  train_dataframe_path="./data.train"
-  dev_dataframe_path="./data.dev"
-  
-  train_data = build_dataframe(train_filepath)
-  #save_dataframe(train_data, train_dataframe_path)
-  dev_data = build_dataframe(dev_filepath)
-  #save_dataframe(dev_data, dev_dataframe_path)
+  def __init__(self,
+               unique_id,
+               example_index,
+               page_id,
+               doc_span_index,
+               tokens,
+               token_to_orig_map,
+               token_is_max_context,
+               input_ids,
+               input_mask,
+               segment_ids,
+               paragraph_len,
+               start_position=None,
+               end_position=None,
+               token_to_tag_index=None,
+               is_impossible=None):
+    self.unique_id = unique_id
+    self.example_index = example_index
+    self.page_id = page_id
+    self.doc_span_index = doc_span_index
+    self.tokens = tokens
+    self.token_to_orig_map = token_to_orig_map
+    self.token_is_max_context = token_is_max_context
+    self.input_ids = input_ids
+    self.input_mask = input_mask
+    self.segment_ids = segment_ids
+    self.paragraph_len = paragraph_len
+    self.start_position = start_position
+    self.end_position = end_position
+    self.token_to_tag_index = token_to_tag_index
+    self.is_impossible = is_impossible
