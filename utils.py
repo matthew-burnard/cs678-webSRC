@@ -10,7 +10,7 @@ from os import path as osp
 from tqdm import tqdm
 import bs4
 from bs4 import BeautifulSoup as bs
-from transformers.tokenization_bert import BasicTokenizer, whitespace_tokenize
+from transformers import BasicTokenizer
 
 # NOTE: Taken directly from author code so we can use preprocessed data.
 class InputFeatures(object):
