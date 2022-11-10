@@ -149,10 +149,10 @@ if __name__ == "__main__":
     model.to(device)
 
     # Train Model
-    # train(train_dataset)
+    train(train_dataset)
 
-    checkpoint = '/content/drive/MyDrive/WebSRC-Baseline/src/result/H-PLM_bert/model_step_1800'
-    model = AutoModelForQuestionAnswering.from_pretrained(checkpoint)
-    model.to(device)
+    #checkpoint = '/content/drive/MyDrive/WebSRC-Baseline/src/result/H-PLM_bert/model_step_1800'
+    #model = AutoModelForQuestionAnswering.from_pretrained(checkpoint)
+    #model.to(device)
 
-    result = evaluate(args, model, tokenizer, prefix="test")
+    #result = evaluate(args, model, tokenizer, prefix="test")
